@@ -12,15 +12,13 @@ import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, wher
 
 // Firebase Config
 const firebaseConfig = {
-  apiKey: "AIzaSyBtu1FMCQAdzhZfdlNOh-jbWm6QSHVgGQg",
-  authDomain: "drivingschool-e23dd.firebaseapp.com",
-  projectId: "drivingschool-e23dd",
-  storageBucket: "drivingschool-e23dd.appspot.com", // FIXED typo from ".firebasestorage.app"
-  messagingSenderId: "132911193392",
-  appId: "1:132911193392:web:fd0835b474fcbeb789fcf5",
-  measurementId: "G-G6KL1LJW2W"
+  apiKey: "AIzaSyDgrnlNotesiBoHVG1bBYRwN153ycPC8wo",
+  authDomain: "registro-clientes-4459b.firebaseapp.com",
+  projectId: "registro-clientes-4459b",
+  storageBucket: "registro-clientes-4459b.firebasestorage.app",
+  messagingSenderId: "248935152171",
+  appId: "1:248935152171:web:498aa8fad28001a973c86e"
 };
-
 // Firebase Init
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
