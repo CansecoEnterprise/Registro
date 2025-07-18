@@ -5,7 +5,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, deleteDoc, doc , updateDoc, orderBy} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
 
 
@@ -19,12 +19,35 @@ const firebaseConfig = {
   messagingSenderId: "248935152171",
   appId: "1:248935152171:web:498aa8fad28001a973c86e"
 };
+
 // Firebase Init
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Wait for DOM
+//Globally accessible
+window.showSuccess = function(message) {
+  document.getElementById('successMessage').innerText = message;
+  document.getElementById('successCard').classList.remove('d-none');
+  document.getElementById('cardOverlay').classList.remove('d-none');
+};
+
+window.showError = function(message) {
+  document.getElementById('errorMessage').innerText = message;
+  document.getElementById('errorCard').classList.remove('d-none');
+  document.getElementById('cardOverlay').classList.remove('d-none');
+};
+
+window.hideCard = function(cardId) {
+  document.getElementById(cardId).classList.add('d-none');
+  document.getElementById('cardOverlay').classList.add('d-none');
+};
+
+
+
+
+
+// Wait for DOM Content Loader 
 document.addEventListener("DOMContentLoaded", () => {
 
   /*============================
@@ -73,9 +96,6 @@ sessionStorage.removeItem("loggedOut"); //clean up
   const registerForm = document.getElementById("registerForm");
 
 if (registerForm) {
-
-
-
 
   // Validation functions
   function validateFirstName() {
@@ -162,6 +182,18 @@ if (registerForm) {
     }, 5000);
   }
   
+// Checkmark references 
+const checkmarkIcon = document.querySelector("#firstNameGroup .checkmark-icon");
+const lastNameCheck = document.getElementById("lastNameCheck");
+const emailCheck = document.getElementById("emailCheck");
+const phoneCheck = document.getElementById("phoneCheck");
+
+function resetCheckmark() {
+    checkmarkIcon.classList.remove("visible");
+    lastNameCheck.classList.remove("visible");
+    emailCheck.classList.remove("visible");
+    phoneCheck.classList.remove("visible");
+}
 
 // Check if user already exists
 async function checkIfUserExists(email, phone) {
@@ -171,6 +203,8 @@ async function checkIfUserExists(email, phone) {
     // Check if online before querying
     if (!navigator.onLine) {
       alert("You're offline. Cannot verify user details.");
+      resetCheckmark();
+      registerForm.reset();
       return true; // Block registration as a safety fallback
     }
 
@@ -179,13 +213,18 @@ async function checkIfUserExists(email, phone) {
     const emailSnap = await getDocs(emailQuery);
 
     if (!emailSnap.empty) {
-      alert("User already registered with that email.");
+      // alert("User already registered with that email.");
+      showError("User already registered with that email.");
+      resetCheckmark();   
+      registerForm.reset();
       return true;
     }
 
     // Check again if internet is still online before second query
     if (!navigator.onLine) {
       alert("You're offline. Could not complete verification.");
+      resetCheckmark();
+      registerForm.reset();        
       return true;
     }
 
@@ -194,7 +233,10 @@ async function checkIfUserExists(email, phone) {
     const phoneSnap = await getDocs(phoneQuery);
 
     if (!phoneSnap.empty) {
-      alert("User already registered with that phone number.");
+      // alert("User already registered with that phone number.");
+      showError("User already registered with that phone number.");
+      resetCheckmark();
+      registerForm.reset();
       return true;
     }
 
@@ -209,7 +251,8 @@ async function checkIfUserExists(email, phone) {
     } else {
       alert("An error occurred while checking registration. Please try again.");
     }
-
+    resetCheckmark();
+    registerForm.reset();
     return true; // Block registration to avoid duplicates
   }
 }
@@ -260,10 +303,15 @@ async function submitToFirebase() {
       datetime: serverTimestamp()
     });
 
-    alert("Thank you for registering!");
+    // alert("Thank you for registering!");
+    showSuccess("Thank you for registering!");
     registerForm.reset();  // Ensure your form has id="registerForm"
     if (spinner) spinner.classList.add("d-none");
-    window.location.href = "index.html";
+  
+setTimeout(() => {
+  window.location.href = "index.html";
+}, 2000);
+
 
   } catch (error) {
     console.error("Error submitting form: ", error);
@@ -271,7 +319,8 @@ async function submitToFirebase() {
     if (!navigator.onLine) {
       alert("You're offline. Please try again when you reconnect.");
     } else {
-      alert("Registration failed. Please try again.");
+      // alert("Registration failed. Please try again.");
+      showError("Registration failed. Please try again.");
     }
 
     if (submitBtn) submitBtn.disabled = false;
@@ -316,6 +365,9 @@ async function submitToFirebase() {
 if (window.location.pathname.includes("clients.html")) {
   
 
+
+
+
   window.addEventListener("pageshow", (event) => {
     if (event.persisted || performance.getEntriesByType("navigation")[0].type === "back_forward") {
       location.reload(); // Force reload when returning via back/forward
@@ -338,39 +390,91 @@ loadClients();
 
   if(!isLoggingOut){
     alert("Please Login to view this page.");
+    window.location.href = "login.html";
   }
 
-  window.location.href = "login.html";
+  
 }
 
 });
 
+//Generic toast toggle
+function showToast(message, status = "success") {
+  const toastEl = document.getElementById("genericToast");
+  const toastBody = document.getElementById("toastBody");
+  const toastIcon = document.getElementById("toastIcon");
+  const toastInner = document.getElementById("toastInner");
+
+  // Set message
+  toastBody.textContent = message;
+
+  // Reset background and icon classes
+  toastInner.classList.remove("bg-success", "bg-danger");
+  toastIcon.className = "bi fs-4"; // Reset icon
+
+  // Set styles based on status
+  if (status === "success") {
+    toastInner.classList.add("bg-success");
+    toastIcon.classList.add("bi-check-circle-fill");
+  } else if (status === "error") {
+    toastInner.classList.add("bg-danger");
+    toastIcon.classList.add("bi-x-circle-fill");
+  }
+
+  // Show toast
+  const toast = bootstrap.Toast.getOrCreateInstance(toastEl, {
+    delay: 2000,
+    autohide: true,
+  });
+
+  toast.show();
+}
+
+
+
 
 //Log out the user
 document.getElementById("logoutBtn").addEventListener("click", () => {
-
-  isLoggingOut = true;
+  const spinnerOverlay = document.getElementById("logoutSpinnerContainer");
+isLoggingOut = true;
+  // Show spinner
+  spinnerOverlay.classList.remove("d-none");
 
   signOut(auth)
     .then(() => {
-      sessionStorage.setItem("loggedOut", "true"); //set flag
-      window.location.href = "login.html";
+      sessionStorage.setItem("loggedOut", "true");
+
+      // ⏱️ Delay redirect by 1.5 seconds to show spinner
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 1000); // Adjust milliseconds as needed (1000 = 1 second)
     })
     .catch((error) => {
       console.error("Logout error:", error);
       alert("Failed to logout: " + error.message);
+
+      // Hide spinner on failure
+      spinnerOverlay.classList.add("d-none");
     });
 });
 
 //Load Database clients to view recent added outside of webpage refresh the page
   async function loadClients() {
-    const querySnapshot = await getDocs(collection(db, "clients"));
+
+
+
+    const q = await query(collection(db, "clients"), orderBy("datetime","desc"));
+
+    const querySnapshot = await getDocs(q);
+
+
     clientsData = [];
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       const date = data.datetime?.toDate?.().toLocaleString?.() || "";
       clientsData.push({
+        id: doc.id, // Add the Firestore document ID
         firstname: data.firstname || "",
         lastname: data.lastname || "",
         email: data.email || "",
@@ -421,6 +525,13 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
     );
   }
 
+//Format phone number function 
+function formatPhoneNumber(phone) {
+  if (!phone || phone.length !== 10) return phone;
+  return `(${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6)}`;
+}
+
+
 
   function renderTable() {
     const tableBody = document.getElementById("clientTableBody");
@@ -435,7 +546,7 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
       const searchTerm = document.getElementById("searchInput").value.trim();
       tableBody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-muted py-4">
+          <td colspan="6" class="text-center text-muted py-4"><i class="bi bi-search me-2"></i>
             No results found for "<strong>${searchTerm}</strong>"
           </td>
         </tr>`;
@@ -443,13 +554,29 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
     }
 
     rowsToShow.forEach(data => {
+
+
+const formattedPhone = formatPhoneNumber(data.phone);
+
+
       const row = `
         <tr>
-          <td>${data.firstname}</td>
-          <td>${data.lastname}</td>
+        <td>
+        <span class="custom-checkbox">
+        <input type="checkbox" id="checkbox1" name="options[]" value="1">
+        <label for="checkbox1"></label>
+        </span>
+        </td>
+          <td>${data.firstname} ${data.lastname}</td>
           <td>${data.email}</td>
-          <td>${data.phone}</td>
-          <td>${new Date(data.date).toLocaleDateString()}</td>
+          <td>${formattedPhone}</td>
+          <td>${new Date(data.date).toLocaleDateString("en-US", {
+            month: "short", day: "numeric", year: "numeric"
+          })}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary edit-icon" data-id="${data.id}" title="Edit"><i class="bi bi-pencil-square"></i></button>
+            <button class="btn btn-sm btn-outline-danger delete-icon" data-id="${data.id}" title="Delete"> <i class="bi bi-trash"></i></button>
+         </td>
         </tr>`;
       tableBody.innerHTML += row;
     });
@@ -472,6 +599,282 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
       pagination.appendChild(btn);
     }
   }
+// ------------------------------  CRUD OPERATIONS ON FIRESTORE DB ------------------------------
+
+
+
+
+
+
+
+
+
+//CREATE 
+
+const addStudentForm = document.getElementById("addStudentForm");
+
+addStudentForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const saveBtn = document.getElementById("saveStudentBtn");
+  const spinner = document.getElementById("addSpinner");
+  const btnText = document.getElementById("addBtnText");
+
+  // Show loading spinner and change button text
+  spinner.classList.remove("d-none");
+  btnText.textContent = "Saving...";
+  saveBtn.disabled = true;
+
+  const newStudent = {
+    firstname: document.getElementById("newFirstName").value.trim(),
+    lastname: document.getElementById("newLastName").value.trim(),
+    email: document.getElementById("newEmail").value.trim(),
+    phone: document.getElementById("newPhone").value.trim(),
+    datetime: new Date(), // Optional: Add timestamp if needed
+  };
+
+  try {
+    await addDoc(collection(db, "clients"), newStudent);
+
+    // Success toast
+    showToast("Student added successfully.", "success");
+
+    // Reload or refresh data
+    loadClients();
+
+    // Reset form
+    addStudentForm.reset();
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById("addStudentModal"));
+    modal.hide();
+  } catch (err) {
+    console.error("Failed to add student:", err);
+    showToast("Failed to add student.", "error");
+  } finally {
+    // Reset UI
+    spinner.classList.add("d-none");
+    btnText.textContent = "Save Student";
+    saveBtn.disabled = false;
+  }
+});
+
+
+
+
+
+
+
+//READ BY Query
+
+function toggleFilterModal() {
+  const modal = document.getElementById("filterModal");
+  modal.style.display = modal.style.display === "block" ? "none" : "block";
+}
+
+async function searchFirestore() {
+  const field = document.getElementById('searchField').value;
+  const value = document.getElementById('searchValue').value.trim();
+  const dateInput = document.getElementById('searchDate').value;
+
+  const db = firebase.firestore(); // or getFirestore() if using modular SDK
+
+  let q;
+  const ref = db.collection("clients");
+
+  if (dateInput) {
+    const start = new Date(dateInput);
+    const end = new Date(dateInput);
+    end.setHours(23, 59, 59, 999);
+
+    q = ref
+      .where("dateRegistered", ">=", start)
+      .where("dateRegistered", "<=", end)
+      .orderBy(field)
+      .startAt(value)
+      .endAt(value + "\uf8ff");
+  } else {
+    q = ref
+      .orderBy(field)
+      .startAt(value)
+      .endAt(value + "\uf8ff");
+  }
+
+  try {
+    const snapshot = await q.get();
+    const results = snapshot.docs.map(doc => doc.data());
+
+    renderTable(results); // Replace with your table rendering logic
+    toggleFilterModal();  // Close modal after search
+  } catch (err) {
+    console.error("Search error:", err);
+  }
+}
+
+
+
+
+
+
+//UPDATE BY ID
+// Populate edit modal on click
+let currentEditId = null;
+document.addEventListener("click", async (e) => {
+  if (e.target.closest(".edit-icon")) {
+    const btn = e.target.closest(".edit-icon");
+    currentEditId = btn.getAttribute("data-id");
+
+    // Find data from table row (you can also fetch from Firestore if needed)
+    const row = btn.closest("tr");
+    const fullName = row.children[1].textContent.trim().split(" ");
+    const email = row.children[2].textContent.trim();
+    const phone = row.children[3].textContent.trim();
+
+    // Prefill modal fields
+    document.getElementById("editFirstName").value = fullName[0] || "";
+    document.getElementById("editLastName").value = fullName[1] || "";
+    document.getElementById("editEmail").value = email;
+    document.getElementById("editPhone").value = phone;
+
+    // Show modal
+    const editModal = new bootstrap.Modal(document.getElementById("editModal"));
+    editModal.show();
+  }
+});
+
+// Handle save changes
+const editForm = document.getElementById("editForm");
+editForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentEditId) return;
+
+
+//Refrence button, and spinner elements
+const editBtn = document.getElementById("confirmEditBtn");
+const spinner = document.getElementById("editSpinner");
+const btnText = document.getElementById("editBtnText");
+
+
+//Show spinner, change text, and disable button 
+spinner.classList.remove("d-none");
+btnText.textContent = "Updating...";
+editBtn.disabled = true;
+
+
+
+
+
+  const updatedData = {
+    firstname: document.getElementById("editFirstName").value.trim(),
+    lastname: document.getElementById("editLastName").value.trim(),
+    email: document.getElementById("editEmail").value.trim(),
+    phone: document.getElementById("editPhone").value.trim(),
+  };
+
+  try {
+    await updateDoc(doc(db, "clients", currentEditId), updatedData);
+
+    // Refresh table data
+    loadClients();
+
+    // Close modal
+    const modalEl = document.getElementById("editModal");
+    const editModalInstance = bootstrap.Modal.getInstance(modalEl);
+    editModalInstance.hide();
+
+    // alert("Entry updated successfully.");
+    showToast("Successfully updated student.","success");
+  } catch (err) {
+    console.error("Update failed:", err);
+    // alert("Failed to update record.");
+    showToast("Failed to update record.");
+  }finally{
+//Reset UI state 
+spinner.classList.add("d-none");
+btnText.textContent = "Save Changes";
+editBtn.disabled = false;
+
+
+  }
+});
+
+
+
+
+
+
+
+
+// DELETE BY ID
+let idToDelete = null;
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".delete-icon")) {
+    const button = e.target.closest(".delete-icon");
+    idToDelete = button.getAttribute("data-id");
+
+    const deleteModal = new bootstrap.Modal(document.getElementById("deleteConfirmModal"));
+    deleteModal.show();
+  }
+});
+
+// Confirm delete logic
+document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
+
+
+
+  if (idToDelete) {
+
+//Refrence button, spinner, and text elements
+const deleteBtn = document.getElementById("confirmDeleteBtn");
+const spinner = document.getElementById("deleteSpinner");
+const btnText = document.getElementById("deleteBtnText");
+
+//Show spinner and change button text
+spinner.classList.remove("d-none");
+btnText.textContent = "Deleting...";
+deleteBtn.disabled = true;
+
+
+
+    try {
+      await deleteDoc(doc(db, "clients", idToDelete));
+      //alert("Succesfully deleted student.");
+
+// Success (green)
+showToast("Successfully deleted student.", "success");
+
+
+      // Reload or re-render table
+      loadClients();
+    } catch (err) {
+      console.error("Failed to delete:", err);
+      alert("Error deleting record.");
+    }finally{
+//Reset button
+spinner.classList.add("d-none");
+btnText.textContent = "Delete";
+deleteBtn.disabled = false;
+
+
+    // Close modal
+    const deleteModalEl = document.getElementById("deleteConfirmModal");
+    const modal = bootstrap.Modal.getInstance(deleteModalEl);
+    modal.hide();
+
+      
+    }
+
+
+  }
+});
+
+
+
+
+
+
 
 
 
